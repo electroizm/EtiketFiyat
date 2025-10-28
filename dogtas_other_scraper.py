@@ -1,7 +1,7 @@
 """
 DOGTAS OTHER.XLSX SCRAPER
 - Other.xlsx'ten SKU okur
-- Her SKU için Google araması yapar
+- Her SKU için Doğtaş sitemap XML'lerinde arama yapar (1.xml - 6.xml)
 - Ürün detaylarını çeker
 - dogtasCom.xlsx'e kaydeder
 """
@@ -18,6 +18,7 @@ from urllib.parse import urljoin, quote
 import pandas as pd
 from typing import List, Optional, Dict
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 def get_base_dir():
@@ -208,13 +209,23 @@ def read_other_xlsx(file_path: str) -> List[str]:
         return []
 
 
-class DogtasGoogleScraper:
-    """Google arama ile Doğtaş ürün scraper"""
+class DogtasSitemapScraper:
+    """Sitemap XML ile Doğtaş ürün scraper"""
 
     def __init__(self, max_concurrent=2):
         self.base_url = "https://www.dogtas.com"
         self.max_concurrent = max_concurrent
         self.semaphore = None
+
+        # Sitemap XML URL'leri
+        self.sitemap_urls = [
+            "https://www.dogtas.com/sitemap/products/1.xml",
+            "https://www.dogtas.com/sitemap/products/2.xml",
+            "https://www.dogtas.com/sitemap/products/3.xml",
+            "https://www.dogtas.com/sitemap/products/4.xml",
+            "https://www.dogtas.com/sitemap/products/5.xml",
+            "https://www.dogtas.com/sitemap/products/6.xml",
+        ]
 
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -229,7 +240,7 @@ class DogtasGoogleScraper:
             'max_timeout': 90,
             'retry_count': 3,
             'backoff_factor': 2,
-            'rate_limit_delay': 2,
+            'rate_limit_delay': 1,  # Sitemap için daha hızlı
         }
 
     async def get_page_async(self, session: aiohttp.ClientSession, url: str, attempt=1):
@@ -265,45 +276,64 @@ class DogtasGoogleScraper:
                 print(f"[ERROR] Başarısız: {url} - {e}")
                 return None
 
-    def get_product_link_from_google(self, soup: BeautifulSoup) -> Optional[str]:
-        """Google arama sonucundan Doğtaş ürün linkini bul"""
-        if not soup:
+    async def get_xml_async(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
+        """XML sitemap dosyasını indir"""
+        try:
+            async with self.semaphore:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                    response.raise_for_status()
+                    xml_content = await response.text()
+                    return xml_content
+        except Exception as e:
+            print(f"[ERROR] XML indirme hatası {url}: {e}")
             return None
 
-        # Google arama sonuçlarını bul
-        # Google'ın farklı selector'ları
-        selectors = [
-            'div.g a[href*="dogtas.com"]',
-            'a[href*="dogtas.com"]',
-            '[data-ved] a[href*="dogtas.com"]',
-        ]
+    def find_sku_in_xml(self, xml_content: str, sku: str) -> Optional[str]:
+        """XML içinde SKU'yu ara ve URL döndür"""
+        if not xml_content:
+            return None
 
-        for selector in selectors:
+        try:
+            # XML namespace
+            namespaces = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+
+            root = ET.fromstring(xml_content)
+
+            # Tüm <loc> etiketlerini kontrol et
+            for url_elem in root.findall('ns:url', namespaces):
+                loc_elem = url_elem.find('ns:loc', namespaces)
+                if loc_elem is not None and loc_elem.text:
+                    url = loc_elem.text.strip()
+                    # SKU URL içinde geçiyor mu?
+                    if sku in url:
+                        return url
+
+            return None
+
+        except Exception as e:
+            print(f"[ERROR] XML parse hatası: {e}")
+            return None
+
+    async def search_sku_in_sitemaps(self, session: aiohttp.ClientSession, sku: str) -> Optional[str]:
+        """SKU'yu tüm sitemap XML'lerinde ara (1-6)"""
+        for idx, sitemap_url in enumerate(self.sitemap_urls, 1):
             try:
-                links = soup.select(selector)
+                # XML indir
+                xml_content = await self.get_xml_async(session, sitemap_url)
 
-                for link in links:
-                    href = link.get('href', '').strip()
+                if xml_content:
+                    # SKU'yu ara
+                    product_url = self.find_sku_in_xml(xml_content, sku)
 
-                    if not href:
-                        continue
+                    if product_url:
+                        print(f"[XML-{idx}]", end=" ")
+                        return product_url
 
-                    # Google redirect URL'lerini temizle
-                    if '/url?q=' in href:
-                        # /url?q=https://www.dogtas.com/... formatından URL'i çek
-                        match = re.search(r'/url\?q=([^&]+)', href)
-                        if match:
-                            href = match.group(1)
-
-                    # Geçersiz linkleri filtrele
-                    if any(skip in href.lower() for skip in ['google.com', 'youtube.com', 'kategori', 'collection']):
-                        continue
-
-                    # Doğtaş ürün sayfası olmalı
-                    if 'dogtas.com' in href and not any(skip in href.lower() for skip in ['/tumu-c-', '/kategori', '/collection']):
-                        return href
+                # Kısa bekleme
+                await asyncio.sleep(0.5)
 
             except Exception as e:
+                print(f"[ERROR] Sitemap {idx} hatası: {e}")
                 continue
 
         return None
@@ -432,24 +462,15 @@ class DogtasGoogleScraper:
             return None
 
     async def search_and_scrape_sku(self, session: aiohttp.ClientSession, sku: str):
-        """SKU ile Google'da ara ve ürün detayını çek"""
+        """SKU ile sitemap XML'lerinde ara ve ürün detayını çek"""
         try:
-            # Google arama URL'si
-            search_url = f"https://www.google.com/search?q=site%3Adogtas.com+{sku}"
-
             print(f"[SEARCH] SKU: {sku}", end=" ")
 
-            # Google arama sayfasını çek
-            soup = await self.get_page_async(session, search_url)
-            if not soup:
-                print("- Google sayfası yüklenemedi")
-                return None
-
-            # Ürün linkini bul
-            product_url = self.get_product_link_from_google(soup)
+            # Sitemap XML'lerinde ara (1-6)
+            product_url = await self.search_sku_in_sitemaps(session, sku)
 
             if not product_url:
-                print("- Ürün linki bulunamadı")
+                print("- Ürün bulunamadı")
                 return None
 
             print(f"- Link bulundu", end=" ")
@@ -583,7 +604,7 @@ def main():
 
     print("="*80, flush=True)
     print("DOGTAS OTHER.XLSX SCRAPER", flush=True)
-    print("Other.xlsx'ten SKU okur -> Google'da arar -> dogtasCom.xlsx'e kaydeder", flush=True)
+    print("Other.xlsx'ten SKU okur -> Sitemap XML'de arar -> dogtasCom.xlsx'e kaydeder", flush=True)
     print("="*80, flush=True)
 
     # Other.xlsx yolu
@@ -607,7 +628,7 @@ def main():
         return
 
     # Scraper oluştur
-    scraper = DogtasGoogleScraper(max_concurrent=2)
+    scraper = DogtasSitemapScraper(max_concurrent=2)
 
     # Zamanlama
     start_time = time.time()
