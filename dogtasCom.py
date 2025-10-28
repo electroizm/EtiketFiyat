@@ -431,11 +431,11 @@ class DogtasAsyncScraper:
                     seen_urls.add(full_url)
 
                 if valid_links:
-                    print(f"[OK] {len(valid_links)} link bulundu (selector: {selector})")
+                    # print(f"[OK] {len(valid_links)} link bulundu (selector: {selector})")
                     return valid_links
 
             except Exception as e:
-                print(f"[DEBUG] Selector hatasi: {selector} - {e}")
+                # print(f"[DEBUG] Selector hatasi: {selector} - {e}")
                 continue
 
         print(f"[WARNING] Hic urun linki bulunamadi")
@@ -661,10 +661,8 @@ class DogtasAsyncScraper:
                     print(f"[WARNING] Link bulunamadi - Tarama tamamlandi")
                     break
 
-                print(f"[OK] {len(product_urls)} urun bulundu")
-
-                # 2. URUNLERI SIRALAMA CEK (daha yavas)
-                print(f"[PROCESSING] Urunler cekiliyor...")
+                # print(f"[OK] {len(product_urls)} urun bulundu")
+                # print(f"[PROCESSING] Urunler cekiliyor...")
 
                 page_success = 0
                 for idx, url in enumerate(product_urls, 1):
