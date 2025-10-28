@@ -646,9 +646,9 @@ class DogtasAsyncScraper:
                     break
 
                 page_url = f"{base_url}{page}"
-                print(f"\n{'='*60}")
-                print(f"SAYFA {page}")
-                print(f"{'='*60}")
+                # print(f"\n{'='*60}")
+                # print(f"SAYFA {page}")
+                # print(f"{'='*60}")
 
                 # 1. Sayfadaki linkleri cek
                 product_urls = await self.get_product_links_from_page(session, page_url)
@@ -1108,11 +1108,11 @@ def main():
     sys.stdout.reconfigure(line_buffering=True)
 
     # Başlangıç mesajları - konsola yaz
-    print("="*80, flush=True)
-    print("DOGTAS SCRAPER - COMBINED VERSION", flush=True)
-    print("1) Ana Doğtaş sitesini tarar (tüm sayfalar)", flush=True)
-    print("2) Other.xlsx'ten SKU okur ve Sitemap XML'de arar", flush=True)
-    print("="*80, flush=True)
+    # print("="*80, flush=True)
+    # print("DOGTAS SCRAPER - COMBINED VERSION", flush=True)
+    # print("1) Ana Doğtaş sitesini tarar (tüm sayfalar)", flush=True)
+    # print("2) Other.xlsx'ten SKU okur ve Sitemap XML'de arar", flush=True)
+    # print("="*80, flush=True)
 
     # Eski backup dosyalarini temizle
     output_dir = Path(get_base_dir())
@@ -1131,15 +1131,15 @@ def main():
     scraper = DogtasAsyncScraper(max_concurrent=1)
 
     # TUM SAYFALARI CEK (max_pages = None)
-    print(f"\n[INFO] TUM sayfalar cekilecek...", flush=True)
+    # print(f"\n[INFO] TUM sayfalar cekilecek...", flush=True)
 
     # Zamanlama
     start_time = time.time()
 
     # SCRAPING
-    print("\n" + "="*80, flush=True)
-    print("SCRAPING BASLIYOR...", flush=True)
-    print("="*80, flush=True)
+    # print("\n" + "="*80, flush=True)
+    # print("SCRAPING BASLIYOR...", flush=True)
+    # print("="*80, flush=True)
 
     all_products = scraper.run(max_pages=None)
 
