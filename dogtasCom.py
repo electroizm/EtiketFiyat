@@ -646,9 +646,7 @@ class DogtasAsyncScraper:
                     break
 
                 page_url = f"{base_url}{page}"
-                # print(f"\n{'='*60}")
-                # print(f"SAYFA {page}")
-                # print(f"{'='*60}")
+
 
                 # 1. Sayfadaki linkleri cek
                 product_urls = await self.get_product_links_from_page(session, page_url)
@@ -924,7 +922,7 @@ class DogtasSitemapScraper:
                 sku_eslesme = re.search(r'(\d+)', sku_metni)
                 veri['sku'] = sku_eslesme.group(1) if sku_eslesme else ""
 
-            # Kategori (breadcrumb)
+            # Kategori 
             breadcrumb_elem = soup.find('ol', class_='breadcrumb')
             if breadcrumb_elem:
                 breadcrumb_items = []
@@ -1076,25 +1074,7 @@ def print_statistics(products: List[Dict]):
         if kat:
             kategoriler[kat] = kategoriler.get(kat, 0) + 1
 
-    print(f"\nKategoriler (Top 10):")
-    for kat, sayi in sorted(kategoriler.items(), key=lambda x: x[1], reverse=True)[:10]:
-        print(f"  - {kat}: {sayi} urun")
 
-    # Fiyat istatistikleri
-    liste_prices = [p.get('LISTE') for p in products if p.get('LISTE')]
-    perakende_prices = [p.get('PERAKENDE') for p in products if p.get('PERAKENDE')]
-
-    if liste_prices:
-        print(f"\nLISTE Fiyat Istatistikleri:")
-        print(f"  - Ortalama: {sum(liste_prices)/len(liste_prices):,.0f} TL")
-        print(f"  - Minimum: {min(liste_prices):,} TL")
-        print(f"  - Maksimum: {max(liste_prices):,} TL")
-
-    if perakende_prices:
-        print(f"\nPERAKENDE Fiyat Istatistikleri:")
-        print(f"  - Ortalama: {sum(perakende_prices)/len(perakende_prices):,.0f} TL")
-        print(f"  - Minimum: {min(perakende_prices):,} TL")
-        print(f"  - Maksimum: {max(perakende_prices):,} TL")
 
     # Duplike urunler (komodin veya ayna)
     yemek_yatak = [p for p in products if p.get('kategori') == 'Yatak Odası' and
@@ -1107,12 +1087,7 @@ def main():
     # Stdout'u flush et (gerçek zamanlı çıktı için)
     sys.stdout.reconfigure(line_buffering=True)
 
-    # Başlangıç mesajları - konsola yaz
-    # print("="*80, flush=True)
-    # print("DOGTAS SCRAPER - COMBINED VERSION", flush=True)
-    # print("1) Ana Doğtaş sitesini tarar (tüm sayfalar)", flush=True)
-    # print("2) Other.xlsx'ten SKU okur ve Sitemap XML'de arar", flush=True)
-    # print("="*80, flush=True)
+
 
     # Eski backup dosyalarini temizle
     output_dir = Path(get_base_dir())
@@ -1130,21 +1105,17 @@ def main():
     # Scraper olustur (concurrent=1, yavas tarama)
     scraper = DogtasAsyncScraper(max_concurrent=1)
 
-    # TUM SAYFALARI CEK (max_pages = None)
-    # print(f"\n[INFO] TUM sayfalar cekilecek...", flush=True)
+
 
     # Zamanlama
     start_time = time.time()
 
-    # SCRAPING
-    # print("\n" + "="*80, flush=True)
-    # print("SCRAPING BASLIYOR...", flush=True)
-    # print("="*80, flush=True)
+
 
     all_products = scraper.run(max_pages=None)
 
     # Duplikasyon kurallari uygula
-    print("\n[PROCESSING] Duplikasyon kurallari uygulanıyor...")
+
     all_products = ProductFilter.apply_duplication_rules(all_products)
 
     # OTHER.XLSX TARAMASI - SITEMAP XML KULLANARAK
